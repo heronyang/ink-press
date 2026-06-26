@@ -13,18 +13,19 @@ import java.util.concurrent.TimeUnit
 object Uploader {
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
+        .connectTimeout(4, TimeUnit.SECONDS) // Short timeout for quick local network resolution
         .writeTimeout(60, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .build()
 
     /**
      * Synchronously pushes an EPUB file to the Xteink X3 device.
+     * Sequentially tries each host in a comma-separated list until one succeeds.
      * Should be called from a background thread (e.g. via Coroutines Dispatchers.IO).
      */
     fun pushFile(
         filePath: String,
-        host: String,
+        hostListString: String,
         port: Int,
         uploadPath: String,
         folder: String
@@ -38,42 +39,65 @@ object Uploader {
                 throw IOException("File does not exist at local path: ${file.absolutePath}")
             }
 
-            // Clean host configuration
-            var cleanHost = host.trim()
-            if (!cleanHost.startsWith("http://") && !cleanHost.startsWith("https://")) {
-                cleanHost = "http://$cleanHost"
-            }
-            // Strip trailing slash if any
-            if (cleanHost.endsWith("/")) {
-                cleanHost = cleanHost.dropLast(1)
+            // Split the comma-separated hosts list
+            val hosts = hostListString.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+            if (hosts.isEmpty()) {
+                throw IOException("No valid host addresses configured")
             }
 
-            // Format upload endpoint path
-            val cleanPath = if (uploadPath.startsWith("/")) uploadPath else "/$uploadPath"
+            var lastException: Exception? = null
+            var success = false
 
-            val url = "$cleanHost:$port$cleanPath"
+            for (host in hosts) {
+                try {
+                    // Clean host configuration
+                    var cleanHost = host
+                    if (!cleanHost.startsWith("http://") && !cleanHost.startsWith("https://")) {
+                        cleanHost = "http://$cleanHost"
+                    }
+                    // Strip trailing slash if any
+                    if (cleanHost.endsWith("/")) {
+                        cleanHost = cleanHost.dropLast(1)
+                    }
 
-            val requestBody = MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-                .addFormDataPart(
-                    "file",
-                    file.name,
-                    file.asRequestBody("application/epub+zip".toMediaTypeOrNull())
-                )
-                // Common parameter keys for destination folders in Web Transfer servers
-                .addFormDataPart("folder", folder)
-                .addFormDataPart("path", folder)
-                .build()
+                    // Format upload endpoint path
+                    val cleanPath = if (uploadPath.startsWith("/")) uploadPath else "/$uploadPath"
+                    val url = "$cleanHost:$port$cleanPath"
 
-            val request = Request.Builder()
-                .url(url)
-                .post(requestBody)
-                .build()
+                    val requestBody = MultipartBody.Builder()
+                        .setType(MultipartBody.FORM)
+                        .addFormDataPart(
+                            "file",
+                            file.name,
+                            file.asRequestBody("application/epub+zip".toMediaTypeOrNull())
+                        )
+                        .addFormDataPart("folder", folder)
+                        .addFormDataPart("path", folder)
+                        .build()
 
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    throw IOException("HTTP error ${response.code}: ${response.message}")
+                    val request = Request.Builder()
+                        .url(url)
+                        .post(requestBody)
+                        .build()
+
+                    client.newCall(request).execute().use { response ->
+                        if (response.isSuccessful) {
+                            success = true
+                        } else {
+                            throw IOException("HTTP error ${response.code}: ${response.message}")
+                        }
+                    }
+
+                    if (success) {
+                        break // Exit loop since this host succeeded
+                    }
+                } catch (e: Exception) {
+                    lastException = e
                 }
+            }
+
+            if (!success) {
+                throw lastException ?: IOException("Failed to connect to any of the configured hosts: $hostListString")
             }
         }
     }

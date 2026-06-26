@@ -99,7 +99,7 @@ class MainActivity : ComponentActivity() {
 
     private fun pushToX3(item: ConversionItem) {
         val sharedPrefs = getSharedPreferences("inkpress_settings", Context.MODE_PRIVATE)
-        val host = sharedPrefs.getString("x3_host", "192.168.86.125") ?: "192.168.86.125"
+        val host = sharedPrefs.getString("x3_host", "crosspoint.local, 192.168.86.125") ?: "crosspoint.local, 192.168.86.125"
         val portStr = sharedPrefs.getString("x3_port", "80") ?: "80"
         val uploadPath = sharedPrefs.getString("x3_path", "/upload") ?: "/upload"
         val folder = sharedPrefs.getString("x3_folder", "InkPress") ?: "InkPress"
@@ -263,7 +263,7 @@ class MainActivity : ComponentActivity() {
         // Settings Dialog Modal
         if (showSettingsDialog) {
             val sharedPrefs = remember { getSharedPreferences("inkpress_settings", Context.MODE_PRIVATE) }
-            var host by remember { mutableStateOf(sharedPrefs.getString("x3_host", "192.168.86.125") ?: "192.168.86.125") }
+            var host by remember { mutableStateOf(sharedPrefs.getString("x3_host", "crosspoint.local, 192.168.86.125") ?: "crosspoint.local, 192.168.86.125") }
             var port by remember { mutableStateOf(sharedPrefs.getString("x3_port", "80") ?: "80") }
             var path by remember { mutableStateOf(sharedPrefs.getString("x3_path", "/upload") ?: "/upload") }
             var folder by remember { mutableStateOf(sharedPrefs.getString("x3_folder", "InkPress") ?: "InkPress") }
