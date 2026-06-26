@@ -24,10 +24,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.os.Environment
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -67,6 +74,63 @@ class MainActivity : ComponentActivity() {
     private val conversionList = mutableStateListOf<ConversionItem>()
     private var isConverting = mutableStateOf(false)
     private var statusMessage = mutableStateOf("")
+    private val uploadStatuses = mutableStateMapOf<String, String>()
+
+    private fun deleteItem(item: ConversionItem) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val fileName = item.filePath.substringAfterLast("/")
+                val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                val file = File(downloadsDir, "InkPress/$fileName")
+                if (file.exists()) {
+                    file.delete()
+                }
+            } catch (e: Exception) {
+                // Ignore file deletion errors
+            }
+            withContext(Dispatchers.Main) {
+                conversionList.remove(item)
+                uploadStatuses.remove(item.filePath)
+                saveHistory()
+                Toast.makeText(this@MainActivity, "Deleted from history and storage", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun pushToX3(item: ConversionItem) {
+        val sharedPrefs = getSharedPreferences("inkpress_settings", Context.MODE_PRIVATE)
+        val host = sharedPrefs.getString("x3_host", "192.168.86.125") ?: "192.168.86.125"
+        val portStr = sharedPrefs.getString("x3_port", "80") ?: "80"
+        val uploadPath = sharedPrefs.getString("x3_path", "/upload") ?: "/upload"
+        val folder = sharedPrefs.getString("x3_folder", "InkPress") ?: "InkPress"
+        val port = portStr.toIntOrNull() ?: 80
+
+        uploadStatuses[item.filePath] = "Uploading..."
+
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                Uploader.pushFile(item.filePath, host, port, uploadPath, folder)
+            }
+            result.fold(
+                onSuccess = {
+                    uploadStatuses[item.filePath] = "Success!"
+                },
+                onFailure = { error ->
+                    uploadStatuses[item.filePath] = "Failed: ${error.localizedMessage}"
+                }
+            )
+        }
+    }
+
+    private fun pushAllToX3() {
+        val items = conversionList.toList()
+        if (items.isEmpty()) {
+            Toast.makeText(this, "No files to push", Toast.LENGTH_SHORT).show()
+            return
+        }
+        Toast.makeText(this, "Pushing all ${items.size} files...", Toast.LENGTH_SHORT).show()
+        items.forEach { pushToX3(it) }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -187,6 +251,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun InkPressApp() {
         var inputUrl by remember { mutableStateOf("") }
+        var showSettingsDialog by remember { mutableStateOf(false) }
 
         // Core theme colors (Sleek e-ink styled paper palette)
         val backgroundColor = Color(0xFFF9F9FB)
@@ -194,6 +259,105 @@ class MainActivity : ComponentActivity() {
         val textColor = Color(0xFF1E2022)
         val primaryColor = Color(0xFF2C3E50) // Slate Blue/Charcoal
         val secondaryTextColor = Color(0xFF7F8C8D)
+
+        // Settings Dialog Modal
+        if (showSettingsDialog) {
+            val sharedPrefs = remember { getSharedPreferences("inkpress_settings", Context.MODE_PRIVATE) }
+            var host by remember { mutableStateOf(sharedPrefs.getString("x3_host", "192.168.86.125") ?: "192.168.86.125") }
+            var port by remember { mutableStateOf(sharedPrefs.getString("x3_port", "80") ?: "80") }
+            var path by remember { mutableStateOf(sharedPrefs.getString("x3_path", "/upload") ?: "/upload") }
+            var folder by remember { mutableStateOf(sharedPrefs.getString("x3_folder", "InkPress") ?: "InkPress") }
+
+            AlertDialog(
+                onDismissRequest = { showSettingsDialog = false },
+                title = { Text("Xteink X3 Settings", fontWeight = FontWeight.Bold, fontFamily = FontFamily.Serif) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("Configure connection parameters for wireless file pushes to your Xteink X3 e-reader.", fontSize = 12.sp, color = secondaryTextColor)
+                        
+                        OutlinedTextField(
+                            value = host,
+                            onValueChange = { host = it },
+                            label = { Text("IP / Host Address") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = port,
+                            onValueChange = { port = it },
+                            label = { Text("Port") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = path,
+                            onValueChange = { path = it },
+                            label = { Text("Upload API Path") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = folder,
+                            onValueChange = { folder = it },
+                            label = { Text("Target Folder Name") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        Text("Connection Presets:", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            ElevatedButton(
+                                onClick = {
+                                    host = "192.168.86.125"
+                                    port = "80"
+                                    path = "/upload"
+                                },
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(vertical = 4.dp)
+                            ) {
+                                Text("Home Wi-Fi", fontSize = 11.sp)
+                            }
+                            ElevatedButton(
+                                onClick = {
+                                    host = "crosspoint.local"
+                                    port = "80"
+                                    path = "/upload"
+                                },
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(vertical = 4.dp)
+                            ) {
+                                Text("X3 Hotspot", fontSize = 11.sp)
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            sharedPrefs.edit().apply {
+                                putString("x3_host", host.trim())
+                                putString("x3_port", port.trim())
+                                putString("x3_path", path.trim())
+                                putString("x3_folder", folder.trim())
+                            }.apply()
+                            showSettingsDialog = false
+                            Toast.makeText(this@MainActivity, "Settings saved", Toast.LENGTH_SHORT).show()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = primaryColor)
+                    ) {
+                        Text("Save", color = Color.White)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showSettingsDialog = false }) {
+                        Text("Cancel", color = primaryColor)
+                    }
+                }
+            )
+        }
 
         MaterialTheme(
             colorScheme = lightColorScheme(
@@ -215,6 +379,15 @@ class MainActivity : ComponentActivity() {
                                 color = primaryColor,
                                 letterSpacing = 0.5.sp
                             )
+                        },
+                        actions = {
+                            IconButton(onClick = { showSettingsDialog = true }) {
+                                Icon(
+                                    Icons.Default.Settings,
+                                    contentDescription = "Settings",
+                                    tint = primaryColor
+                                )
+                            }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
                             containerColor = backgroundColor
@@ -277,14 +450,36 @@ class MainActivity : ComponentActivity() {
 
                         Spacer(modifier = Modifier.height(28.dp))
 
-                        // History section header
-                        Text(
-                            "Recent Conversions",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
-                            color = primaryColor,
-                            modifier = Modifier.padding(bottom = 12.dp)
-                        )
+                        // History section header with Batch Push option
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "Recent Conversions",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                color = primaryColor
+                            )
+                            if (conversionList.isNotEmpty()) {
+                                TextButton(
+                                    onClick = { pushAllToX3() },
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Send,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp),
+                                        tint = primaryColor
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Push All to X3", fontSize = 12.sp, color = primaryColor, fontWeight = FontWeight.SemiBold)
+                                }
+                            }
+                        }
 
                         if (conversionList.isEmpty()) {
                             Box(
@@ -298,7 +493,7 @@ class MainActivity : ComponentActivity() {
                                     color = secondaryTextColor,
                                     fontSize = 14.sp,
                                     lineHeight = 20.sp,
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                    textAlign = TextAlign.Center
                                 )
                             }
                         } else {
@@ -341,7 +536,7 @@ class MainActivity : ComponentActivity() {
                                     fontWeight = FontWeight.Medium,
                                     fontSize = 14.sp,
                                     color = textColor,
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                    textAlign = TextAlign.Center
                                 )
                             }
                         }
@@ -408,6 +603,70 @@ class MainActivity : ComponentActivity() {
                         text = dateString,
                         fontSize = 11.sp,
                         color = secondaryTextColor
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                Divider(color = Color(0xFFEEEEEE), thickness = 1.dp)
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Push button
+                        TextButton(
+                            onClick = { pushToX3(item) },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Send,
+                                contentDescription = "Push",
+                                modifier = Modifier.size(12.dp),
+                                tint = primaryColor
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Push to X3", fontSize = 11.sp, color = primaryColor, fontWeight = FontWeight.Bold)
+                        }
+
+                        // Delete button
+                        TextButton(
+                            onClick = { deleteItem(item) },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = "Delete",
+                                modifier = Modifier.size(12.dp),
+                                tint = Color(0xFFC0392B)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Delete", fontSize = 11.sp, color = Color(0xFFC0392B), fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    // Status message
+                    val status = uploadStatuses[item.filePath] ?: "Ready"
+                    val statusColor = when {
+                        status.startsWith("Success") -> Color(0xFF27AE60) // Green
+                        status.startsWith("Failed") -> Color(0xFFC0392B) // Red
+                        status == "Uploading..." -> Color(0xFF2980B9) // Blue
+                        else -> secondaryTextColor
+                    }
+                    Text(
+                        text = status,
+                        fontSize = 11.sp,
+                        color = statusColor,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(end = 4.dp).widthIn(max = 120.dp)
                     )
                 }
             }

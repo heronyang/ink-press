@@ -79,6 +79,9 @@ dependencies {
     // HTML Scraping/Parsing
     implementation("org.jsoup:jsoup:1.17.2")
 
+    // HTTP Networking for X3 Upload
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
