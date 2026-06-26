@@ -63,6 +63,32 @@ object Uploader {
                     // Format folder path cleanly
                     val cleanFolder = folder.trim().trim('/')
 
+                    // Create remote directories on the SD card if needed before uploading
+                    if (cleanFolder.isNotEmpty()) {
+                        val parts = cleanFolder.split("/").map { it.trim() }.filter { it.isNotEmpty() }
+                        var currentParent = "/"
+                        for (part in parts) {
+                            try {
+                                val mkdirUrl = "$cleanHost:$port/mkdir"
+                                val formBody = okhttp3.FormBody.Builder()
+                                    .add("name", part)
+                                    .add("path", currentParent)
+                                    .build()
+                                val mkdirRequest = Request.Builder()
+                                    .url(mkdirUrl)
+                                    .post(formBody)
+                                    .build()
+                                client.newCall(mkdirRequest).execute().use { response ->
+                                    // Ignored: we don't need to assert success because if the folder already exists,
+                                    // the server might return an error status which we can safely bypass.
+                                }
+                            } catch (e: Exception) {
+                                // Ignore exceptions since the directory might already exist
+                            }
+                            currentParent = if (currentParent == "/") "/$part" else "$currentParent/$part"
+                        }
+                    }
+
                     // Format upload endpoint path
                     val cleanPath = if (uploadPath.startsWith("/")) uploadPath else "/$uploadPath"
                     
