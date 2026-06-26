@@ -84,4 +84,4 @@ The output signed App Bundle is saved to:
 ---
 
 ## 📄 License
-This project is open-source and licensed under the MIT License.
+This project is open-source and licensed under the GNU General Public License v3.0 (GPLv3). See the [LICENSE](file:///Users/heronyang/Projects/url-converter/LICENSE) file for details.
