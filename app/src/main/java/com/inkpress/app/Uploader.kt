@@ -61,7 +61,7 @@ object Uploader {
 
                     // Format upload endpoint path
                     val cleanPath = if (uploadPath.startsWith("/")) uploadPath else "/$uploadPath"
-                    val url = "$cleanHost:$port$cleanPath?path=/"
+                    val url = "$cleanHost:$port$cleanPath"
 
                     val requestBody = MultipartBody.Builder()
                         .setType(MultipartBody.FORM)
