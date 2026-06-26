@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Central Group containing the logo, scaled and centered within the 72dp safe zone -->
+    <group
+        android:translateX="14"
+        android:translateY="14">
+        
+        <!-- Book spine and back cover -->
+        <path
+            android:fillColor="#E5E7EB"
+            android:pathData="M24,18 L52,18 C55,18 58,21 58,24 L58,56 C58,59 55,62 52,62 L24,62 C21,62 18,59 18,56 L18,24 C18,21 21,18 24,18 Z" />
+            
+        <!-- Book front page lines (simulating text) -->
+        <path
+            android:strokeColor="#2C3E50"
+            android:strokeWidth="3"
+            android:strokeLineCap="round"
+            android:pathData="M26,28 L46,28 M26,36 L46,36 M26,44 L38,44" />
+            
+        <!-- Inkwell / Ink Droplet (drawn in brand slate-blue at the corner) -->
+        <path
+            android:fillColor="#1E2022"
+            android:pathData="M52,42 C52,42 58,48 58,52 A 6,6 0 1,1 46,52 C46,48 52,42 52,42 Z" />
+            
+    </group>
+</vector>

@@ -1,0 +1,17 @@
+# Built-in Gradle files
+.gradle
+build/
+app/build/
+
+# Local configuration (SDK paths, keystore properties, local passwords)
+local.properties
+*.jks
+*.keystore
+
+# IDE / Editor files
+.idea/
+*.iml
+.DS_Store
+
+# Temporary outputs
+test_output.epub
