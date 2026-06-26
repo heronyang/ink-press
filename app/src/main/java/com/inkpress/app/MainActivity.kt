@@ -127,9 +127,15 @@ class MainActivity : ComponentActivity() {
                         statusMessage.value = "Creating EPUB: ${article.title}..."
                     }
 
-                    // Standardize file name
-                    val safeTitle = article.title.take(30).trim()
-                    val fileName = "${safeTitle}_inkpress"
+                    // Standardize file name: YYYY-MM-DD-title-inkpress format for chronological sorting
+                    val datePrefix = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+                    val slugTitle = article.title.take(40).trim()
+                        .lowercase(Locale.US)
+                        .replace(Regex("[^a-z0-9\\s-]"), "")
+                        .replace(Regex("\\s+"), "-")
+                        .replace(Regex("-+"), "-")
+                        .trim('-')
+                    val fileName = "$datePrefix-$slugTitle-inkpress"
                     
                     val outputPair = StorageHelper.getOutputStreamForEpub(this@MainActivity, fileName)
                         ?: throw Exception("Failed to create file output stream")
