@@ -60,25 +60,48 @@ object Uploader {
                         cleanHost = cleanHost.dropLast(1)
                     }
 
-                    // Format upload endpoint path
-                    val cleanPath = if (uploadPath.startsWith("/")) uploadPath else "/$uploadPath"
-                    val url = "$cleanHost:$port$cleanPath"
+                    // Format folder path cleanly
+                    val cleanFolder = folder.trim().trim('/')
 
-                    val requestBody = MultipartBody.Builder()
+                    // Format upload endpoint path and append URL query params for folder destination
+                    val cleanPath = if (uploadPath.startsWith("/")) uploadPath else "/$uploadPath"
+                    val queryParams = if (cleanFolder.isNotEmpty()) {
+                        "?folder=$cleanFolder&path=$cleanFolder&dir=$cleanFolder"
+                    } else {
+                        ""
+                    }
+                    val url = "$cleanHost:$port$cleanPath$queryParams"
+
+                    // Append folder prefix to filename inside Content-Disposition header
+                    val filenameInForm = if (cleanFolder.isNotEmpty()) "$cleanFolder/${file.name}" else file.name
+
+                    val requestBodyBuilder = MultipartBody.Builder()
                         .setType(MultipartBody.FORM)
                         .addFormDataPart(
                             "file",
-                            file.name,
+                            filenameInForm,
                             file.asRequestBody("application/epub+zip".toMediaTypeOrNull())
                         )
-                        .addFormDataPart("folder", folder)
-                        .addFormDataPart("path", folder)
-                        .build()
 
-                    val request = Request.Builder()
+                    // Add folder parameters in multipart form body
+                    if (cleanFolder.isNotEmpty()) {
+                        requestBodyBuilder.addFormDataPart("folder", cleanFolder)
+                        requestBodyBuilder.addFormDataPart("path", cleanFolder)
+                        requestBodyBuilder.addFormDataPart("dir", cleanFolder)
+                    }
+                    val requestBody = requestBodyBuilder.build()
+
+                    // Add custom headers containing destination folder parameters
+                    val requestBuilder = Request.Builder()
                         .url(url)
                         .post(requestBody)
-                        .build()
+
+                    if (cleanFolder.isNotEmpty()) {
+                        requestBuilder.addHeader("X-Folder", cleanFolder)
+                        requestBuilder.addHeader("X-Path", cleanFolder)
+                        requestBuilder.addHeader("X-Dir", cleanFolder)
+                    }
+                    val request = requestBuilder.build()
 
                     client.newCall(request).execute().use { response ->
                         if (response.isSuccessful) {
