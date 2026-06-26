@@ -27,8 +27,7 @@ object Uploader {
         filePath: String,
         hostListString: String,
         port: Int,
-        uploadPath: String,
-        folder: String
+        uploadPath: String
     ): Result<Unit> {
         return runCatching {
             val fileName = filePath.substringAfterLast("/")
@@ -60,58 +59,18 @@ object Uploader {
                         cleanHost = cleanHost.dropLast(1)
                     }
 
-                    // Format folder path cleanly
-                    val cleanFolder = folder.trim().trim('/')
-
-                    // Create remote directories on the SD card if needed before uploading
-                    if (cleanFolder.isNotEmpty()) {
-                        val parts = cleanFolder.split("/").map { it.trim() }.filter { it.isNotEmpty() }
-                        var currentParent = "/"
-                        for (part in parts) {
-                            try {
-                                val mkdirUrl = "$cleanHost:$port/mkdir"
-                                val formBody = okhttp3.FormBody.Builder()
-                                    .add("name", part)
-                                    .add("path", currentParent)
-                                    .build()
-                                val mkdirRequest = Request.Builder()
-                                    .url(mkdirUrl)
-                                    .post(formBody)
-                                    .build()
-                                client.newCall(mkdirRequest).execute().use { response ->
-                                    // Ignored: we don't need to assert success because if the folder already exists,
-                                    // the server might return an error status which we can safely bypass.
-                                }
-                            } catch (e: Exception) {
-                                // Ignore exceptions since the directory might already exist
-                            }
-                            currentParent = if (currentParent == "/") "/$part" else "$currentParent/$part"
-                        }
-                    }
-
                     // Format upload endpoint path
                     val cleanPath = if (uploadPath.startsWith("/")) uploadPath else "/$uploadPath"
-                    
-                    // Format path parameter for query (starting with a leading slash as expected by CrossPoint WebServer)
-                    val pathParam = if (cleanFolder.isNotEmpty()) "/$cleanFolder" else "/"
-                    val url = "$cleanHost:$port$cleanPath?path=$pathParam"
+                    val url = "$cleanHost:$port$cleanPath?path=/"
 
-                    val requestBodyBuilder = MultipartBody.Builder()
+                    val requestBody = MultipartBody.Builder()
                         .setType(MultipartBody.FORM)
                         .addFormDataPart(
                             "file",
-                            file.name, // Keep original file.name strictly without folder path to prevent content-disposition crashes
+                            file.name,
                             file.asRequestBody("application/epub+zip".toMediaTypeOrNull())
                         )
-
-                    // Add folder parameters in multipart form body
-                    if (cleanFolder.isNotEmpty()) {
-                        val absoluteFolderPath = "/$cleanFolder"
-                        requestBodyBuilder.addFormDataPart("folder", absoluteFolderPath)
-                        requestBodyBuilder.addFormDataPart("path", absoluteFolderPath)
-                        requestBodyBuilder.addFormDataPart("dir", absoluteFolderPath)
-                    }
-                    val requestBody = requestBodyBuilder.build()
+                        .build()
 
                     val request = Request.Builder()
                         .url(url)

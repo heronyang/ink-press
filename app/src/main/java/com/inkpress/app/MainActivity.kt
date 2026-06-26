@@ -102,14 +102,13 @@ class MainActivity : ComponentActivity() {
         val host = sharedPrefs.getString("x3_host", "crosspoint.local, 192.168.86.125") ?: "crosspoint.local, 192.168.86.125"
         val portStr = sharedPrefs.getString("x3_port", "80") ?: "80"
         val uploadPath = sharedPrefs.getString("x3_path", "/upload") ?: "/upload"
-        val folder = sharedPrefs.getString("x3_folder", "InkPress") ?: "InkPress"
         val port = portStr.toIntOrNull() ?: 80
 
         uploadStatuses[item.filePath] = "Uploading..."
 
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
-                Uploader.pushFile(item.filePath, host, port, uploadPath, folder)
+                Uploader.pushFile(item.filePath, host, port, uploadPath)
             }
             result.fold(
                 onSuccess = {
@@ -266,7 +265,6 @@ class MainActivity : ComponentActivity() {
             var host by remember { mutableStateOf(sharedPrefs.getString("x3_host", "crosspoint.local, 192.168.86.125") ?: "crosspoint.local, 192.168.86.125") }
             var port by remember { mutableStateOf(sharedPrefs.getString("x3_port", "80") ?: "80") }
             var path by remember { mutableStateOf(sharedPrefs.getString("x3_path", "/upload") ?: "/upload") }
-            var folder by remember { mutableStateOf(sharedPrefs.getString("x3_folder", "InkPress") ?: "InkPress") }
 
             AlertDialog(
                 onDismissRequest = { showSettingsDialog = false },
@@ -293,13 +291,6 @@ class MainActivity : ComponentActivity() {
                             value = path,
                             onValueChange = { path = it },
                             label = { Text("Upload API Path") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
-                        )
-                        OutlinedTextField(
-                            value = folder,
-                            onValueChange = { folder = it },
-                            label = { Text("Target Folder Name") },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
                         )
@@ -341,7 +332,6 @@ class MainActivity : ComponentActivity() {
                                 putString("x3_host", host.trim())
                                 putString("x3_port", port.trim())
                                 putString("x3_path", path.trim())
-                                putString("x3_folder", folder.trim())
                             }.apply()
                             showSettingsDialog = false
                             Toast.makeText(this@MainActivity, "Settings saved", Toast.LENGTH_SHORT).show()
