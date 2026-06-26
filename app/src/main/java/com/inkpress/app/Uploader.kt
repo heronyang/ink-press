@@ -63,26 +63,27 @@ object Uploader {
                     // Format folder path cleanly
                     val cleanFolder = folder.trim().trim('/')
 
-                    // Format upload endpoint path (no query parameters to prevent routing crashes)
+                    // Format upload endpoint path
                     val cleanPath = if (uploadPath.startsWith("/")) uploadPath else "/$uploadPath"
-                    val url = "$cleanHost:$port$cleanPath"
-
-                    // Append folder prefix to filename inside Content-Disposition header
-                    val filenameInForm = if (cleanFolder.isNotEmpty()) "$cleanFolder/${file.name}" else file.name
+                    
+                    // Format path parameter for query (starting with a leading slash as expected by CrossPoint WebServer)
+                    val pathParam = if (cleanFolder.isNotEmpty()) "/$cleanFolder" else "/"
+                    val url = "$cleanHost:$port$cleanPath?path=$pathParam"
 
                     val requestBodyBuilder = MultipartBody.Builder()
                         .setType(MultipartBody.FORM)
                         .addFormDataPart(
                             "file",
-                            filenameInForm,
+                            file.name, // Keep original file.name strictly without folder path to prevent content-disposition crashes
                             file.asRequestBody("application/epub+zip".toMediaTypeOrNull())
                         )
 
                     // Add folder parameters in multipart form body
                     if (cleanFolder.isNotEmpty()) {
-                        requestBodyBuilder.addFormDataPart("folder", cleanFolder)
-                        requestBodyBuilder.addFormDataPart("path", cleanFolder)
-                        requestBodyBuilder.addFormDataPart("dir", cleanFolder)
+                        val absoluteFolderPath = "/$cleanFolder"
+                        requestBodyBuilder.addFormDataPart("folder", absoluteFolderPath)
+                        requestBodyBuilder.addFormDataPart("path", absoluteFolderPath)
+                        requestBodyBuilder.addFormDataPart("dir", absoluteFolderPath)
                     }
                     val requestBody = requestBodyBuilder.build()
 
@@ -95,7 +96,10 @@ object Uploader {
                         if (response.isSuccessful) {
                             success = true
                         } else {
-                            throw IOException("HTTP error ${response.code}: ${response.message}")
+                            // Read full HTTP error details from response body if available
+                            val errorBody = response.body?.string()?.take(500) ?: ""
+                            val detailMsg = if (errorBody.isNotBlank()) " - $errorBody" else ""
+                            throw IOException("HTTP error ${response.code}: ${response.message}$detailMsg")
                         }
                     }
 
