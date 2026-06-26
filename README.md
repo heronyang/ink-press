@@ -62,26 +62,7 @@ Ensure USB Debugging is enabled on your phone/emulator and run:
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
----
 
-## 📦 Google Play Store Releases
-
-To compile the production Android App Bundle (`.aab`):
-1. Add your signing keystore details to your local `gradle.properties` file:
-   ```properties
-   inkpress.release.keystorePath=/path/to/inkpress.keystore
-   inkpress.release.storePassword=keystore_password
-   inkpress.release.keyAlias=inkpress-key-alias
-   inkpress.release.keyPassword=key_password
-   ```
-2. Build the optimized App Bundle:
-   ```bash
-   ./gradlew bundleRelease
-   ```
-The output signed App Bundle is saved to:  
-`app/build/outputs/bundle/release/app-release.aab` *(Minified size: **~2.65 MB**)*.
-
----
 
 ## 📄 License
 This project is open-source and licensed under the GNU General Public License v3.0 (GPLv3). See the [LICENSE](file:///Users/heronyang/Projects/url-converter/LICENSE) file for details.
