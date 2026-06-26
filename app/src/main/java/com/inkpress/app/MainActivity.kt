@@ -651,8 +651,13 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    // Status message
+                    // Status message (simple summary indicator)
                     val status = uploadStatuses[item.filePath] ?: "Ready"
+                    val statusText = when {
+                        status.startsWith("Success") -> "Success!"
+                        status.startsWith("Failed") -> "Failed"
+                        else -> status
+                    }
                     val statusColor = when {
                         status.startsWith("Success") -> Color(0xFF27AE60) // Green
                         status.startsWith("Failed") -> Color(0xFFC0392B) // Red
@@ -660,13 +665,24 @@ class MainActivity : ComponentActivity() {
                         else -> secondaryTextColor
                     }
                     Text(
-                        text = status,
+                        text = statusText,
                         fontSize = 11.sp,
                         color = statusColor,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(end = 4.dp).widthIn(max = 120.dp)
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(end = 4.dp)
+                    )
+                }
+
+                // If upload failed, display the full, un-truncated error message at the bottom of the card
+                val status = uploadStatuses[item.filePath] ?: "Ready"
+                if (status.startsWith("Failed")) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = status,
+                        fontSize = 11.sp,
+                        color = Color(0xFFC0392B),
+                        lineHeight = 15.sp,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)
                     )
                 }
             }

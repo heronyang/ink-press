@@ -63,14 +63,9 @@ object Uploader {
                     // Format folder path cleanly
                     val cleanFolder = folder.trim().trim('/')
 
-                    // Format upload endpoint path and append URL query params for folder destination
+                    // Format upload endpoint path (no query parameters to prevent routing crashes)
                     val cleanPath = if (uploadPath.startsWith("/")) uploadPath else "/$uploadPath"
-                    val queryParams = if (cleanFolder.isNotEmpty()) {
-                        "?folder=$cleanFolder&path=$cleanFolder&dir=$cleanFolder"
-                    } else {
-                        ""
-                    }
-                    val url = "$cleanHost:$port$cleanPath$queryParams"
+                    val url = "$cleanHost:$port$cleanPath"
 
                     // Append folder prefix to filename inside Content-Disposition header
                     val filenameInForm = if (cleanFolder.isNotEmpty()) "$cleanFolder/${file.name}" else file.name
@@ -91,17 +86,10 @@ object Uploader {
                     }
                     val requestBody = requestBodyBuilder.build()
 
-                    // Add custom headers containing destination folder parameters
-                    val requestBuilder = Request.Builder()
+                    val request = Request.Builder()
                         .url(url)
                         .post(requestBody)
-
-                    if (cleanFolder.isNotEmpty()) {
-                        requestBuilder.addHeader("X-Folder", cleanFolder)
-                        requestBuilder.addHeader("X-Path", cleanFolder)
-                        requestBuilder.addHeader("X-Dir", cleanFolder)
-                    }
-                    val request = requestBuilder.build()
+                        .build()
 
                     client.newCall(request).execute().use { response ->
                         if (response.isSuccessful) {
